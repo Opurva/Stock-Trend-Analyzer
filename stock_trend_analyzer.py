@@ -136,8 +136,6 @@ plt.title("Moving Average Comparison")
 plt.legend()
 plt.show()
 
-pip install streamlit yfinance pandas matplotlib
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
