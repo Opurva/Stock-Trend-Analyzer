@@ -7,7 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1BmUJ9bHCeu_h65souN1S0TEmUfZb2J0p
 """
 
-!pip install yfinance
 
 # Import libraries
 import yfinance as yf
