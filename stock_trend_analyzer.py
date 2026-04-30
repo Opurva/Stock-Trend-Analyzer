@@ -45,12 +45,18 @@ if selected_stocks:
             st.line_chart(normalized)
 
             # Metrics
-            st.subheader("📊 Latest Prices")
             cols = st.columns(len(selected_stocks))
 
-            for i, stock in enumerate(selected_stocks):
-                latest_price = data[stock].iloc[-1]
-                cols[i].metric(stock, round(latest_price, 2))
+for i, stock in enumerate(selected_stocks):
+    latest = data[stock].iloc[-1]
+    prev = data[stock].iloc[-2]
+
+    change = latest - prev
+
+    if change > 0:
+        cols[i].metric(stock, round(latest, 2), f"+{round(change,2)} 🟢")
+    else:
+        cols[i].metric(stock, round(latest, 2), f"{round(change,2)} 🔴")
 
         # ================== TAB 2: INDICATORS ==================
         with tab2:
@@ -81,6 +87,18 @@ if selected_stocks:
                     st.write(f"{stock}: 📉 Downtrend")
                 else:
                     st.write(f"{stock}: 😐 Sideways")
+           
+            st.subheader("📊 Buy/Sell Signals")
+
+for stock in selected_stocks:
+    ma5 = data[stock].rolling(5).mean().iloc[-1]
+    ma20 = data[stock].rolling(20).mean().iloc[-1]
+
+    if ma5 > ma20:
+        st.success(f"{stock}: 🟢 BUY Signal")
+    else:
+        st.error(f"{stock}: 🔴 SELL Signal")
+           
 
             # Best performer
             normalized = data / data.iloc[0] * 100
