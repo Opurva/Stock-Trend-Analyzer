@@ -8,7 +8,7 @@ st.set_page_config(page_title="Stock Analyzer", layout="wide")
 # ------------------ TITLE ------------------
 st.title("📊 Stock Trend Analyzer")
 
-# ------------------ SESSION STATE (PORTFOLIO) ------------------
+# ------------------ SESSION STATE ------------------
 if "portfolio" not in st.session_state:
     st.session_state.portfolio = []
 
@@ -44,11 +44,11 @@ if st.sidebar.button("Buy Stock"):
 if selected_stocks:
     data = yf.download(selected_stocks, start=start_date, end=end_date)['Close']
 
-    if data.empty:
-        st.error("❌ No data found. Try different stocks or date range.")
+    if data.empty or len(data) < 2:
+        st.error("❌ Not enough data. Try different stocks or dates.")
     else:
-        tab1, tab2, tab3, tab4 = st.tabs(
-            ["📊 Charts", "📉 Indicators", "🧠 Analysis", "💰 Portfolio"]
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
+            ["📊 Charts", "📉 Indicators", "🧠 Analysis", "💰 Portfolio", "📰 News"]
         )
 
         # ================== TAB 1: CHARTS ==================
@@ -115,7 +115,6 @@ if selected_stocks:
                 else:
                     st.error(f"{stock}: 🔴 SELL Signal")
 
-            # Best performer
             normalized = data / data.iloc[0] * 100
             returns = normalized.iloc[-1]
             best_stock = returns.idxmax()
@@ -141,18 +140,40 @@ if selected_stocks:
 
                         shares = invested / initial_price
                         current_value = shares * current_price
-
                         profit = current_value - invested
 
                         total_value += current_value
 
                         if profit > 0:
-                            st.success(
-                                f"{stock}: ₹{round(current_value,2)} (+{round(profit,2)}) 🟢"
-                            )
+                            st.success(f"{stock}: ₹{round(current_value,2)} (+{round(profit,2)}) 🟢")
                         else:
-                            st.error(
-                                f"{stock}: ₹{round(current_value,2)} ({round(profit,2)}) 🔴"
-                            )
+                            st.error(f"{stock}: ₹{round(current_value,2)} ({round(profit,2)}) 🔴")
 
                 st.info(f"💼 Total Portfolio Value: ₹{round(total_value,2)}")
+
+        # ================== TAB 5: NEWS ==================
+        with tab5:
+            st.subheader("📰 Latest Stock News")
+
+            try:
+                news_stock = st.selectbox("Select stock for news", selected_stocks)
+
+                stock_obj = yf.Ticker(news_stock)
+                news = stock_obj.news
+
+                if not news:
+                    st.write("No news available.")
+                else:
+                    for n in news[:5]:
+                        st.markdown(f"### {n['title']}")
+
+                        if 'publisher' in n:
+                            st.write(f"📰 Source: {n['publisher']}")
+
+                        if 'link' in n:
+                            st.markdown(f"[Read more]({n['link']})")
+
+                        st.write("---")
+
+            except Exception:
+                st.error("❌ Error fetching news")
