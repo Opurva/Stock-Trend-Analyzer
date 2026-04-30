@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import requests
 
 # ------------------ PAGE CONFIG ------------------
 st.set_page_config(page_title="Stock Analyzer", layout="wide")
@@ -26,20 +27,6 @@ selected_stocks = st.sidebar.multiselect(
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2022-01-01"))
 end_date = st.sidebar.date_input("End Date", pd.to_datetime("2024-01-01"))
 
-# ------------------ PORTFOLIO INPUT ------------------
-st.sidebar.subheader("💰 Portfolio")
-
-money = st.sidebar.number_input("Enter Investment Amount", min_value=1000, value=10000)
-
-buy_stock = st.sidebar.selectbox("Select Stock to Invest", stock_options)
-
-if st.sidebar.button("Buy Stock"):
-    st.session_state.portfolio.append({
-        "stock": buy_stock,
-        "amount": money
-    })
-    st.sidebar.success(f"Added {buy_stock} to portfolio")
-
 # ------------------ FETCH DATA ------------------
 if selected_stocks:
     data = yf.download(selected_stocks, start=start_date, end=end_date)['Close']
@@ -51,13 +38,12 @@ if selected_stocks:
             ["📊 Charts", "📉 Indicators", "🧠 Analysis", "💰 Portfolio", "📰 News"]
         )
 
-        # ================== TAB 1: CHARTS ==================
+        # ================== TAB 1 ==================
         with tab1:
             st.subheader("📈 Price Comparison")
             st.line_chart(data)
 
             normalized = data / data.iloc[0] * 100
-
             st.subheader("⚖️ Performance Comparison")
             st.line_chart(normalized)
 
@@ -74,7 +60,7 @@ if selected_stocks:
                 else:
                     cols[i].metric(stock, round(latest, 2), f"{round(change,2)} 🔴")
 
-        # ================== TAB 2: INDICATORS ==================
+        # ================== TAB 2 ==================
         with tab2:
             stock = selected_stocks[0]
 
@@ -89,7 +75,7 @@ if selected_stocks:
 
             st.line_chart(rsi)
 
-        # ================== TAB 3: ANALYSIS ==================
+        # ================== TAB 3 ==================
         with tab3:
             st.subheader("🧠 Trend Analysis")
 
@@ -115,15 +101,35 @@ if selected_stocks:
                 else:
                     st.error(f"{stock}: 🔴 SELL Signal")
 
-            normalized = data / data.iloc[0] * 100
-            returns = normalized.iloc[-1]
+            returns = (data / data.iloc[0] * 100).iloc[-1]
             best_stock = returns.idxmax()
 
             st.success(f"🏆 Best Performer: {best_stock}")
 
-        # ================== TAB 4: PORTFOLIO ==================
+        # ================== TAB 4 ==================
         with tab4:
-            st.subheader("💰 Your Portfolio")
+            st.subheader("💰 Portfolio Manager")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                money = st.number_input("Enter Investment Amount", min_value=1000, value=10000)
+
+            with col2:
+                buy_stock = st.selectbox("Select Stock", selected_stocks)
+
+            if st.button("Buy Stock"):
+                st.session_state.portfolio.append({
+                    "stock": buy_stock,
+                    "amount": money
+                })
+                st.success(f"Added {buy_stock} to portfolio")
+
+            if st.button("Clear Portfolio"):
+                st.session_state.portfolio = []
+
+            st.write("---")
+            st.subheader("📊 Your Portfolio")
 
             if len(st.session_state.portfolio) == 0:
                 st.write("No investments yet.")
@@ -151,29 +157,30 @@ if selected_stocks:
 
                 st.info(f"💼 Total Portfolio Value: ₹{round(total_value,2)}")
 
-        # ================== TAB 5: NEWS ==================
+        # ================== TAB 5 ==================
         with tab5:
             st.subheader("📰 Latest Stock News")
 
+            api_key = "4ae345ea76394297b12b5cfdc8f6fd9e"
+
+            news_stock = st.selectbox("Select stock for news", selected_stocks)
+
+            url = f"https://newsapi.org/v2/everything?q={news_stock} stock&apiKey={api_key}"
+
             try:
-                news_stock = st.selectbox("Select stock for news", selected_stocks)
+                response = requests.get(url)
+                data_news = response.json()
 
-                stock_obj = yf.Ticker(news_stock)
-                news = stock_obj.news
+                articles = data_news.get("articles", [])
 
-                if not news:
-                    st.write("No news available.")
+                if len(articles) == 0:
+                    st.write("No news found.")
                 else:
-                    for n in news[:5]:
-                        st.markdown(f"### {n['title']}")
-
-                        if 'publisher' in n:
-                            st.write(f"📰 Source: {n['publisher']}")
-
-                        if 'link' in n:
-                            st.markdown(f"[Read more]({n['link']})")
-
+                    for article in articles[:5]:
+                        st.markdown(f"### {article['title']}")
+                        st.write(f"📰 Source: {article['source']['name']}")
+                        st.markdown(f"[Read more]({article['url']})")
                         st.write("---")
 
-            except Exception:
+            except:
                 st.error("❌ Error fetching news")
