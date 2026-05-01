@@ -179,7 +179,7 @@ if selected_stocks:
         with tab5:
             st.subheader("📰 Latest News")
 
-            api_key = "YOUR_API_KEY_HERE"
+            api_key = "4ae345ea76394297b12b5cfdc8f6fd9e"
 
             news_stock = st.selectbox("Select stock for news", selected_stocks)
 
