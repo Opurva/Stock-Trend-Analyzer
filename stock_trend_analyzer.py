@@ -306,6 +306,9 @@ if selected_stocks:
 
         for item in st.session_state.portfolio:
 
+            if not isinstance(item, dict):
+                continue
+
             stock = item.get("stock")
             amount = item.get("amount")
 
