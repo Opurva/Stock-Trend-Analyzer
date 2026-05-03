@@ -329,7 +329,7 @@ if selected_stocks:
             key="news_stock"
         )
 
-        api_key = "YOUR_NEWS_API_KEY"
+        api_key = "4ae345ea76394297b12b5cfdc8f6fd9e"
 
         url = (
             f"https://newsapi.org/v2/everything?"
