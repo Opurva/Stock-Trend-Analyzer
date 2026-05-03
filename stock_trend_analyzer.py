@@ -12,7 +12,7 @@ from textblob import TextBlob
 
 
 # =====================================================
-# PAGE
+# PAGE CONFIG
 # =====================================================
 st.set_page_config(
     page_title="Stock Intelligence Platform",
@@ -23,7 +23,7 @@ st.title("📊 AI Stock Intelligence Platform")
 
 
 # =====================================================
-# SESSION
+# SESSION STATE
 # =====================================================
 if "portfolio" not in st.session_state:
     st.session_state.portfolio = []
@@ -80,7 +80,7 @@ end_date = st.sidebar.date_input(
 # =====================================================
 # MAIN
 # =====================================================
-if selected_stocks:
+if len(selected_stocks) > 0:
 
     try:
 
@@ -128,7 +128,7 @@ if selected_stocks:
             key="chart"
         )
 
-        # Logo
+        # Show Logo
         if chart_stock in logo_urls:
 
             try:
@@ -139,6 +139,7 @@ if selected_stocks:
             except:
                 pass
 
+        # Download full OHLC data
         stock_df = yf.download(
             chart_stock,
             start=start_date,
@@ -149,7 +150,6 @@ if selected_stocks:
 
         stock_df = stock_df.dropna()
 
-        # Candlestick
         st.subheader("🕯 Candlestick Chart")
 
         if not stock_df.empty:
@@ -177,13 +177,13 @@ if selected_stocks:
 
         else:
 
-            st.warning("Candlestick data unavailable.")
+            st.warning("Chart unavailable.")
 
         # Comparison
         st.subheader("📈 Price Comparison")
         st.line_chart(data)
 
-        # Normalized
+        # Performance
         st.subheader("⚖ Performance Comparison")
 
         normalized = data / data.iloc[0] * 100
@@ -202,10 +202,6 @@ if selected_stocks:
             key="rsi"
         )
 
-        st.subheader(
-            f"RSI Indicator - {indicator_stock}"
-        )
-
         prices = data[indicator_stock]
 
         delta = prices.diff()
@@ -222,6 +218,10 @@ if selected_stocks:
 
         rsi = 100 - (
             100 / (1 + rs)
+        )
+
+        st.subheader(
+            f"RSI - {indicator_stock}"
         )
 
         st.line_chart(rsi)
@@ -298,6 +298,8 @@ if selected_stocks:
                 "amount": invest_amount
             })
 
+            st.success("Added Successfully")
+
         if st.button("Clear Portfolio"):
 
             st.session_state.portfolio = []
@@ -316,7 +318,6 @@ if selected_stocks:
                 continue
 
             buy_price = data[stock].iloc[0]
-
             current_price = data[stock].iloc[-1]
 
             shares = amount / buy_price
@@ -340,7 +341,7 @@ if selected_stocks:
                 )
 
         st.info(
-            f"Total Value: ₹{round(total_value,2)}"
+            f"Portfolio Value: ₹{round(total_value,2)}"
         )
 
 
@@ -372,6 +373,10 @@ if selected_stocks:
                 "articles",
                 []
             )[:5]
+
+            if len(articles) == 0:
+
+                st.info("No news found.")
 
             for article in articles:
 
@@ -412,19 +417,15 @@ if selected_stocks:
 
         except:
 
-            st.warning(
-                "News unavailable."
-            )
+            st.warning("News unavailable.")
 
 
     # =====================================================
-    # TAB 6 : BETTER ML
+    # TAB 6 : ML PREDICTION
     # =====================================================
     with tabs[5]:
 
-        st.subheader(
-            "ML Price Prediction"
-        )
+        st.subheader("ML Price Prediction")
 
         ml_stock = st.selectbox(
             "Select Stock",
@@ -432,101 +433,124 @@ if selected_stocks:
             key="ml"
         )
 
-        prices = data[ml_stock].values
+        prices = data[ml_stock].dropna().values
 
-        X = []
-        y = []
+        if len(prices) < 30:
 
-        # Use previous 5 days
-        for i in range(5, len(prices)):
-
-            X.append(
-                prices[i-5:i]
+            st.warning(
+                "Not enough data."
             )
 
-            y.append(
-                prices[i]
+        else:
+
+            X = []
+            y = []
+
+            # Use last 5 days as features
+            for i in range(5, len(prices)):
+
+                X.append(
+                    prices[i-5:i]
+                )
+
+                y.append(
+                    prices[i]
+                )
+
+            X = np.array(X)
+            y = np.array(y)
+
+            # Remove invalid rows
+            valid_mask = (
+                ~np.isnan(X).any(axis=1)
+            ) & (
+                ~np.isnan(y)
             )
 
-        X = np.array(X)
-        y = np.array(y)
+            X = X[valid_mask]
+            y = y[valid_mask]
 
-        split = int(
-            len(X) * 0.8
-        )
+            if len(X) < 10:
 
-        X_train = X[:split]
-        X_test = X[split:]
+                st.warning(
+                    "Insufficient clean data."
+                )
 
-        y_train = y[:split]
-        y_test = y[split:]
+            else:
 
-        model = RandomForestRegressor(
-            n_estimators=100,
-            random_state=42
-        )
+                split = int(
+                    len(X) * 0.8
+                )
 
-        model.fit(
-            X_train,
-            y_train
-        )
+                X_train = X[:split]
+                X_test = X[split:]
 
-        predictions = model.predict(
-            X_test
-        )
+                y_train = y[:split]
+                y_test = y[split:]
 
-        mae = mean_absolute_error(
-            y_test,
-            predictions
-        )
+                model = RandomForestRegressor(
+                    n_estimators=100,
+                    random_state=42
+                )
 
-        r2 = r2_score(
-            y_test,
-            predictions
-        )
+                model.fit(
+                    X_train,
+                    y_train
+                )
 
-        st.write(
-            f"MAE: {round(mae,2)}"
-        )
+                predictions = model.predict(
+                    X_test
+                )
 
-        st.write(
-            f"R² Score: {round(r2,2)}"
-        )
+                mae = mean_absolute_error(
+                    y_test,
+                    predictions
+                )
 
-        # Future prediction
-        last_window = list(
-            prices[-5:]
-        )
+                r2 = r2_score(
+                    y_test,
+                    predictions
+                )
 
-        future_preds = []
+                st.write(
+                    f"MAE: {round(mae,2)}"
+                )
 
-        for _ in range(30):
+                st.write(
+                    f"R² Score: {round(r2,2)}"
+                )
 
-            pred = model.predict(
-                [last_window]
-            )[0]
+                # Future Prediction
+                last_window = list(
+                    prices[-5:]
+                )
 
-            future_preds.append(
-                pred
-            )
+                future_preds = []
 
-            last_window.pop(0)
+                for _ in range(30):
 
-            last_window.append(
-                pred
-            )
+                    pred = model.predict(
+                        [last_window]
+                    )[0]
 
-        pred_df = pd.DataFrame({
-            "Predicted Price": future_preds
-        })
+                    future_preds.append(
+                        pred
+                    )
 
-        st.subheader(
-            "Next 30 Days Forecast"
-        )
+                    last_window.pop(0)
+                    last_window.append(pred)
 
-        st.line_chart(
-            pred_df
-        )
+                pred_df = pd.DataFrame({
+                    "Predicted Price": future_preds
+                })
+
+                st.subheader(
+                    "Next 30 Days Forecast"
+                )
+
+                st.line_chart(
+                    pred_df
+                )
 
 else:
 
