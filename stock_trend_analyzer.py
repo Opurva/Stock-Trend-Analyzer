@@ -3,23 +3,42 @@ import yfinance as yf
 import pandas as pd
 import requests
 import numpy as np
-from sklearn.linear_model import LinearRegression
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
+
+from textblob import TextBlob
 import plotly.graph_objects as go
 
-# ------------------ PAGE CONFIG ------------------
-st.set_page_config(page_title="Stock Analyzer", layout="wide")
+# ---------------- PAGE ----------------
+st.set_page_config(page_title="Stock Intelligence Platform", layout="wide")
+st.title("📊 AI Stock Intelligence Platform")
 
-# ------------------ TITLE ------------------
-st.title("📊 Stock Trend Analyzer")
-
-# ------------------ SESSION STATE ------------------
+# ---------------- SESSION ----------------
 if "portfolio" not in st.session_state:
     st.session_state.portfolio = []
 
-# ------------------ SIDEBAR ------------------
+# ---------------- LOGOS ----------------
+logo_urls = {
+    "AAPL": "https://logo.clearbit.com/apple.com",
+    "MSFT": "https://logo.clearbit.com/microsoft.com",
+    "GOOGL": "https://logo.clearbit.com/google.com",
+    "TSLA": "https://logo.clearbit.com/tesla.com",
+    "RELIANCE.NS": "https://logo.clearbit.com/ril.com",
+    "TCS.NS": "https://logo.clearbit.com/tcs.com"
+}
+
+# ---------------- SIDEBAR ----------------
 st.sidebar.header("User Input")
 
-stock_options = ["AAPL", "MSFT", "GOOGL", "TSLA", "RELIANCE.NS", "TCS.NS"]
+stock_options = [
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "TSLA",
+    "RELIANCE.NS",
+    "TCS.NS"
+]
 
 selected_stocks = st.sidebar.multiselect(
     "Select Stocks",
@@ -27,199 +46,363 @@ selected_stocks = st.sidebar.multiselect(
     default=["AAPL"]
 )
 
-start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2022-01-01"))
-end_date = st.sidebar.date_input("End Date", pd.to_datetime("2024-01-01"))
+start_date = st.sidebar.date_input(
+    "Start Date",
+    pd.to_datetime("2022-01-01")
+)
 
-# ------------------ FETCH DATA ------------------
+end_date = st.sidebar.date_input(
+    "End Date",
+    pd.to_datetime("2024-12-31")
+)
+
+# ---------------- FETCH DATA ----------------
 if selected_stocks:
-    data = yf.download(selected_stocks, start=start_date, end=end_date)['Close']
 
-    if data.empty or len(data) < 2:
-        st.error("❌ Not enough data.")
-    else:
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-            ["📊 Charts", "📉 Indicators", "🧠 Analysis", "💰 Portfolio", "📰 News", "🤖 Prediction"]
+    data = yf.download(
+        selected_stocks,
+        start=start_date,
+        end=end_date
+    )["Close"]
+
+    if data.empty:
+        st.error("No stock data found.")
+        st.stop()
+
+    if len(selected_stocks) == 1:
+        data = pd.DataFrame(data)
+
+    tabs = st.tabs([
+        "📈 Charts",
+        "📉 Indicators",
+        "🧠 Analysis",
+        "💰 Portfolio",
+        "📰 News",
+        "🤖 Prediction"
+    ])
+
+    # ==========================================================
+    # TAB 1
+    # ==========================================================
+    with tabs[0]:
+
+        st.subheader("Charts")
+
+        chart_stock = st.selectbox(
+            "Select stock",
+            selected_stocks
         )
 
-        # ================== TAB 1: CHARTS ==================
-        with tab1:
-            st.subheader("📊 Charts")
+        if chart_stock in logo_urls:
+            st.image(
+                logo_urls[chart_stock],
+                width=80
+            )
 
-            stock = st.selectbox("Select stock for chart", selected_stocks)
-            df = yf.download(stock, start=start_date, end=end_date)
+        stock_df = yf.download(
+            chart_stock,
+            start=start_date,
+            end=end_date
+        )
 
-            # Candlestick Chart
-            st.subheader("🕯️ Candlestick Chart")
-            fig = go.Figure(data=[go.Candlestick(
-                x=df.index,
-                open=df['Open'],
-                high=df['High'],
-                low=df['Low'],
-                close=df['Close']
-            )])
+        # Candlestick
+        st.subheader("🕯 Candlestick Chart")
 
-            fig.update_layout(xaxis_rangeslider_visible=False)
-            st.plotly_chart(fig, use_container_width=True)
+        fig = go.Figure(data=[
+            go.Candlestick(
+                x=stock_df.index,
+                open=stock_df["Open"],
+                high=stock_df["High"],
+                low=stock_df["Low"],
+                close=stock_df["Close"]
+            )
+        ])
 
-            # Line Chart
-            st.subheader("📈 Price Comparison")
-            st.line_chart(data)
+        fig.update_layout(
+            xaxis_rangeslider_visible=False
+        )
 
-            # Normalized
-            normalized = data / data.iloc[0] * 100
-            st.subheader("⚖️ Performance Comparison")
-            st.line_chart(normalized)
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
-            # Metrics
-            st.subheader("📊 Latest Prices")
-            cols = st.columns(len(selected_stocks))
+        # Price comparison
+        st.subheader("📈 Price Comparison")
+        st.line_chart(data)
 
-            for i, s in enumerate(selected_stocks):
-                latest = data[s].iloc[-1]
-                prev = data[s].iloc[-2]
-                change = latest - prev
+        # Normalized comparison
+        st.subheader("⚖ Performance Comparison")
 
-                if change > 0:
-                    cols[i].metric(s, round(latest, 2), f"+{round(change,2)} 🟢")
-                else:
-                    cols[i].metric(s, round(latest, 2), f"{round(change,2)} 🔴")
+        normalized = data / data.iloc[0] * 100
+        st.line_chart(normalized)
 
-        # ================== TAB 2: INDICATORS ==================
-        with tab2:
-            stock = selected_stocks[0]
+    # ==========================================================
+    # TAB 2
+    # ==========================================================
+    with tabs[1]:
 
-            st.subheader(f"📉 RSI Indicator ({stock})")
+        indicator_stock = st.selectbox(
+            "Choose stock for RSI",
+            selected_stocks,
+            key="rsi"
+        )
 
-            delta = data[stock].diff()
-            gain = delta.clip(lower=0).rolling(14).mean()
-            loss = -delta.clip(upper=0).rolling(14).mean()
+        st.subheader(f"RSI - {indicator_stock}")
 
-            rs = gain / loss
-            rsi = 100 - (100 / (1 + rs))
+        delta = data[indicator_stock].diff()
 
-            st.line_chart(rsi)
+        gain = delta.clip(
+            lower=0
+        ).rolling(14).mean()
 
-        # ================== TAB 3: ANALYSIS ==================
-        with tab3:
-            st.subheader("🧠 Trend Analysis")
+        loss = -delta.clip(
+            upper=0
+        ).rolling(14).mean()
 
-            for s in selected_stocks:
-                ma5 = data[s].rolling(5).mean().iloc[-1]
-                ma20 = data[s].rolling(20).mean().iloc[-1]
+        rs = gain / loss
 
-                if ma5 > ma20:
-                    st.write(f"{s}: 📈 Uptrend")
-                elif ma5 < ma20:
-                    st.write(f"{s}: 📉 Downtrend")
-                else:
-                    st.write(f"{s}: 😐 Sideways")
+        rsi = 100 - (
+            100 / (1 + rs)
+        )
 
-            st.subheader("📊 Buy/Sell Signals")
+        st.line_chart(rsi)
 
-            for s in selected_stocks:
-                ma5 = data[s].rolling(5).mean().iloc[-1]
-                ma20 = data[s].rolling(20).mean().iloc[-1]
+    # ==========================================================
+    # TAB 3
+    # ==========================================================
+    with tabs[2]:
 
-                if ma5 > ma20:
-                    st.success(f"{s}: 🟢 BUY Signal")
-                else:
-                    st.error(f"{s}: 🔴 SELL Signal")
+        st.subheader("Trend + Risk Analysis")
 
-        # ================== TAB 4: PORTFOLIO ==================
-        with tab4:
-            st.subheader("💰 Portfolio Manager")
+        for stock in selected_stocks:
 
-            col1, col2 = st.columns(2)
+            prices = data[stock]
 
-            with col1:
-                money = st.number_input("Investment Amount", min_value=1000, value=10000)
+            ma5 = prices.rolling(5).mean().iloc[-1]
+            ma20 = prices.rolling(20).mean().iloc[-1]
 
-            with col2:
-                buy_stock = st.selectbox("Select Stock", selected_stocks)
+            returns = prices.pct_change()
 
-            if st.button("Buy Stock"):
-                st.session_state.portfolio.append({
-                    "stock": buy_stock,
-                    "amount": money
-                })
-                st.success(f"Added {buy_stock}")
+            volatility = returns.std()
 
-            if st.button("Clear Portfolio"):
-                st.session_state.portfolio = []
-
-            st.subheader("📊 Your Portfolio")
-
-            if len(st.session_state.portfolio) == 0:
-                st.write("No investments yet.")
+            # Trend
+            if ma5 > ma20:
+                trend = "📈 Uptrend"
+                signal = "BUY"
             else:
-                total_value = 0
+                trend = "📉 Downtrend"
+                signal = "SELL"
 
-                for item in st.session_state.portfolio:
-                    stock = item["stock"]
-                    invested = item["amount"]
+            # Risk
+            if volatility < 0.015:
+                risk = "🟢 Low Risk"
+            elif volatility < 0.03:
+                risk = "🟡 Medium Risk"
+            else:
+                risk = "🔴 High Risk"
 
-                    if stock in data.columns:
-                        current_price = data[stock].iloc[-1]
-                        initial_price = data[stock].iloc[0]
+            st.write(
+                f"{stock} | {trend} | {risk} | Recommendation: {signal}"
+            )
 
-                        shares = invested / initial_price
-                        current_value = shares * current_price
-                        profit = current_value - invested
+    # ==========================================================
+    # TAB 4
+    # ==========================================================
+    with tabs[3]:
 
-                        total_value += current_value
+        st.subheader("Portfolio Manager")
 
-                        if profit > 0:
-                            st.success(f"{stock}: ₹{round(current_value,2)} (+{round(profit,2)}) 🟢")
-                        else:
-                            st.error(f"{stock}: ₹{round(current_value,2)} ({round(profit,2)}) 🔴")
+        invest_stock = st.selectbox(
+            "Select stock",
+            selected_stocks,
+            key="portfolio"
+        )
 
-                st.info(f"💼 Total Value: ₹{round(total_value,2)}")
+        invest_amount = st.number_input(
+            "Investment Amount",
+            min_value=1000,
+            value=10000
+        )
 
-        # ================== TAB 5: NEWS ==================
-        with tab5:
-            st.subheader("📰 Latest News")
+        if st.button("Add to Portfolio"):
 
-            api_key = "4ae345ea76394297b12b5cfdc8f6fd9e"
+            st.session_state.portfolio.append({
+                "stock": invest_stock,
+                "amount": invest_amount
+            })
 
-            news_stock = st.selectbox("Select stock for news", selected_stocks)
+        if st.button("Clear Portfolio"):
 
-            url = f"https://newsapi.org/v2/everything?q={news_stock} stock&apiKey={api_key}"
+            st.session_state.portfolio = []
 
-            try:
-                response = requests.get(url)
-                news_data = response.json()
+        total_value = 0
 
-                articles = news_data.get("articles", [])
+        for item in st.session_state.portfolio:
 
-                if len(articles) == 0:
-                    st.write("No news found.")
+            stock = item["stock"]
+            amount = item["amount"]
+
+            buy_price = data[stock].iloc[0]
+            current_price = data[stock].iloc[-1]
+
+            shares = amount / buy_price
+
+            current_value = shares * current_price
+
+            profit = current_value - amount
+
+            total_value += current_value
+
+            if profit >= 0:
+                st.success(
+                    f"{stock}: ₹{round(current_value,2)} (+₹{round(profit,2)})"
+                )
+            else:
+                st.error(
+                    f"{stock}: ₹{round(current_value,2)} (-₹{abs(round(profit,2))})"
+                )
+
+        st.info(
+            f"Total Portfolio Value: ₹{round(total_value,2)}"
+        )
+
+    # ==========================================================
+    # TAB 5
+    # ==========================================================
+    with tabs[4]:
+
+        st.subheader("News + Sentiment")
+
+        news_stock = st.selectbox(
+            "Choose stock",
+            selected_stocks,
+            key="news"
+        )
+
+        api_key = "4ae345ea76394297b12b5cfdc8f6fd9e"
+
+        url = (
+            f"https://newsapi.org/v2/everything?"
+            f"q={news_stock}&apiKey={api_key}"
+        )
+
+        try:
+
+            response = requests.get(url)
+            articles = response.json()["articles"][:5]
+
+            for article in articles:
+
+                title = article["title"]
+
+                polarity = TextBlob(
+                    title
+                ).sentiment.polarity
+
+                if polarity > 0:
+                    sentiment = "🟢 Positive"
+                elif polarity < 0:
+                    sentiment = "🔴 Negative"
                 else:
-                    for article in articles[:5]:
-                        st.markdown(f"### {article['title']}")
-                        st.write(f"📰 {article['source']['name']}")
-                        st.markdown(f"[Read more]({article['url']})")
-                        st.write("---")
-            except:
-                st.error("Error fetching news")
+                    sentiment = "⚪ Neutral"
 
-        # ================== TAB 6: ML PREDICTION ==================
-        with tab6:
-            st.subheader("🤖 Price Prediction")
+                st.markdown(f"### {title}")
+                st.write(sentiment)
+                st.markdown(
+                    f"[Read More]({article['url']})"
+                )
+                st.write("---")
 
-            stock = selected_stocks[0]
+        except:
+            st.warning(
+                "News unavailable."
+            )
 
-            df = data[stock].reset_index()
-            df['Days'] = np.arange(len(df))
+    # ==========================================================
+    # TAB 6
+    # ==========================================================
+    with tabs[5]:
 
-            X = df[['Days']]
-            y = df[stock]
+        st.subheader("ML Stock Prediction")
 
-            model = LinearRegression()
-            model.fit(X, y)
+        ml_stock = st.selectbox(
+            "Choose stock",
+            selected_stocks,
+            key="ml"
+        )
 
-            future_days = 30
-            future_X = np.arange(len(df), len(df) + future_days).reshape(-1, 1)
+        df = data[ml_stock].reset_index()
 
-            predictions = model.predict(future_X)
+        df["Day"] = np.arange(
+            len(df)
+        )
 
-            st.line_chart(predictions)
+        X = df[["Day"]]
+        y = df[ml_stock]
+
+        split = int(
+            len(df) * 0.8
+        )
+
+        X_train = X[:split]
+        X_test = X[split:]
+
+        y_train = y[:split]
+        y_test = y[split:]
+
+        model = RandomForestRegressor(
+            n_estimators=100,
+            random_state=42
+        )
+
+        model.fit(
+            X_train,
+            y_train
+        )
+
+        y_pred = model.predict(
+            X_test
+        )
+
+        mae = mean_absolute_error(
+            y_test,
+            y_pred
+        )
+
+        r2 = r2_score(
+            y_test,
+            y_pred
+        )
+
+        st.write(
+            f"MAE: {round(mae,2)}"
+        )
+
+        st.write(
+            f"R² Score: {round(r2,2)}"
+        )
+
+        # Future prediction
+        future_days = 30
+
+        future_X = pd.DataFrame({
+            "Day": np.arange(
+                len(df),
+                len(df) + future_days
+            )
+        })
+
+        future_predictions = model.predict(
+            future_X
+        )
+
+        st.subheader(
+            "Next 30 Days Prediction"
+        )
+
+        pred_df = pd.DataFrame({
+            "Predicted Price": future_predictions
+        })
+
+        st.line_chart(pred_df)
