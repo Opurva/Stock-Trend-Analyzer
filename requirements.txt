@@ -2,7 +2,7 @@ streamlit
 yfinance
 pandas
 numpy
-scikit-learn
 plotly
 requests
+scikit-learn
 textblob
