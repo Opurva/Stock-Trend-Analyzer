@@ -1,7 +1,8 @@
 streamlit
 yfinance
 pandas
-requests
 numpy
 scikit-learn
 plotly
+requests
+textblob
