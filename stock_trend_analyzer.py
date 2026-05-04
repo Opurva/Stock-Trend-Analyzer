@@ -44,8 +44,7 @@ authenticator = stauth.Authenticate(
 )
 
 name, authentication_status, username = authenticator.login(
-    "Login",
-    "main"
+    location="main"
 )
 
 
@@ -62,7 +61,9 @@ elif authentication_status == None:
 
 elif authentication_status:
 
-    authenticator.logout("Logout", "sidebar")
+    authenticator.logout(
+    location="sidebar"
+    )
 
     st.sidebar.success(
         f"Welcome {name}"
