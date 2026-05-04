@@ -30,7 +30,7 @@ usernames = ["Opurva", "demo"]
 
 passwords = ["12345", "demo123"]
 
-hashed_passwords = stauth.Hasher(passwords).generate()
+hashed_passwords = stauth.Hasher.hash_passwords(passwords)
 
 credentials = {
     "usernames": {
