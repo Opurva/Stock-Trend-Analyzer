@@ -45,7 +45,8 @@ if not st.session_state.logged_in:
 
     valid_users = {
         "opurva": "12345",
-        "demo": "demo123"
+        "demo": "demo123",
+        "vasu": "Glitterydihh69"
     }
 
     if st.button("Login"):
