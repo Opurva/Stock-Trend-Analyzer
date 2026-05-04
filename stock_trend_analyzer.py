@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
-
 from textblob import TextBlob
 
 
@@ -24,23 +23,15 @@ st.set_page_config(
 # =====================================================
 # LOGIN SYSTEM
 # =====================================================
-names = ["Opurva", "Demo User"]
-
-usernames = ["Opurva", "demo"]
-
-passwords = ["12345", "demo123"]
-
-hashed_passwords = stauth.Hasher.hash_passwords(passwords)
-
 credentials = {
     "usernames": {
-        usernames[0]: {
-            "name": names[0],
-            "password": hashed_passwords[0]
+        "opurva": {
+            "name": "Opurva",
+            "password": "$2b$12$yQnM0P4l6oJ3XWw4eBq6DeFf0J1xD0W1k7Jg7p8NwV8z8wM1rQ4xW"
         },
-        usernames[1]: {
-            "name": names[1],
-            "password": hashed_passwords[1]
+        "demo": {
+            "name": "Demo User",
+            "password": "$2b$12$Hf7JmN5kL2pQxR9sT4uV7eA8bC1dE3fG5hI7jK9lM2nP4qR6sT8uW"
         }
     }
 }
@@ -59,17 +50,15 @@ name, authentication_status, username = authenticator.login(
 
 
 # =====================================================
-# AUTH CHECK
+# LOGIN CHECK
 # =====================================================
 if authentication_status == False:
 
     st.error("Invalid username or password")
 
-
 elif authentication_status == None:
 
     st.warning("Please login")
-
 
 elif authentication_status:
 
@@ -83,7 +72,7 @@ elif authentication_status:
 
 
     # =====================================================
-    # SESSION STATE
+    # SESSION
     # =====================================================
     if "portfolio" not in st.session_state:
         st.session_state.portfolio = []
@@ -142,27 +131,18 @@ elif authentication_status:
     # =====================================================
     if len(selected_stocks) > 0:
 
-        try:
-
-            data = yf.download(
-                selected_stocks,
-                start=start_date,
-                end=end_date,
-                progress=False
-            )["Close"]
-
-        except:
-
-            st.error("Unable to fetch stock data.")
-            st.stop()
+        data = yf.download(
+            selected_stocks,
+            start=start_date,
+            end=end_date,
+            progress=False
+        )["Close"]
 
         if data.empty:
-
             st.error("No stock data found.")
             st.stop()
 
         if len(selected_stocks) == 1:
-
             data = pd.DataFrame(data)
 
         tabs = st.tabs([
@@ -176,14 +156,13 @@ elif authentication_status:
 
 
         # =====================================================
-        # TAB 1 : CHARTS
+        # TAB 1
         # =====================================================
         with tabs[0]:
 
             chart_stock = st.selectbox(
                 "Select Stock",
-                selected_stocks,
-                key="chart"
+                selected_stocks
             )
 
             if chart_stock in logo_urls:
@@ -233,17 +212,16 @@ elif authentication_status:
 
 
         # =====================================================
-        # TAB 2 : RSI
+        # TAB 2
         # =====================================================
         with tabs[1]:
 
-            indicator_stock = st.selectbox(
-                "Select Stock",
-                selected_stocks,
-                key="rsi"
+            rsi_stock = st.selectbox(
+                "RSI Stock",
+                selected_stocks
             )
 
-            prices = data[indicator_stock]
+            prices = data[rsi_stock]
 
             delta = prices.diff()
 
@@ -265,7 +243,7 @@ elif authentication_status:
 
 
         # =====================================================
-        # TAB 3 : ANALYSIS
+        # TAB 3
         # =====================================================
         with tabs[2]:
 
@@ -274,6 +252,7 @@ elif authentication_status:
                 prices = data[stock]
 
                 ma5 = prices.rolling(5).mean().iloc[-1]
+
                 ma20 = prices.rolling(20).mean().iloc[-1]
 
                 if ma5 > ma20:
@@ -290,46 +269,40 @@ elif authentication_status:
 
 
         # =====================================================
-        # TAB 4 : PORTFOLIO
+        # TAB 4
         # =====================================================
         with tabs[3]:
 
             invest_stock = st.selectbox(
-                "Select Stock",
-                selected_stocks,
-                key="portfolio"
+                "Portfolio Stock",
+                selected_stocks
             )
 
-            invest_amount = st.number_input(
+            amount = st.number_input(
                 "Investment Amount",
-                min_value=1000,
-                value=10000
+                min_value=1000
             )
 
-            if st.button("Add to Portfolio"):
+            if st.button("Add"):
 
                 st.session_state.portfolio.append({
                     "stock": invest_stock,
-                    "amount": invest_amount
+                    "amount": amount
                 })
 
-            for item in st.session_state.portfolio:
-
-                if not isinstance(item, dict):
-                    continue
-
-                st.write(item)
+            st.write(
+                st.session_state.portfolio
+            )
 
 
         # =====================================================
-        # TAB 5 : NEWS
+        # TAB 5
         # =====================================================
         with tabs[4]:
 
             news_stock = st.selectbox(
-                "Select Stock",
-                selected_stocks,
-                key="news"
+                "News Stock",
+                selected_stocks
             )
 
             api_key = "4ae345ea76394297b12b5cfdc8f6fd9e"
@@ -368,36 +341,39 @@ elif authentication_status:
                     else:
                         sentiment = "⚪ Neutral"
 
-                    st.markdown(
-                        f"### {title}"
-                    )
-
+                    st.write(title)
                     st.write(sentiment)
 
             except:
 
-                st.warning("News unavailable.")
+                st.warning(
+                    "News unavailable"
+                )
 
 
         # =====================================================
-        # TAB 6 : ML
+        # TAB 6
         # =====================================================
         with tabs[5]:
 
             ml_stock = st.selectbox(
-                "Select Stock",
-                selected_stocks,
-                key="ml"
+                "ML Stock",
+                selected_stocks
             )
 
-            prices = data[ml_stock].dropna().values
+            prices = data[
+                ml_stock
+            ].dropna().values
 
             if len(prices) > 30:
 
                 X = []
                 y = []
 
-                for i in range(5, len(prices)):
+                for i in range(
+                    5,
+                    len(prices)
+                ):
 
                     X.append(
                         prices[i-5:i]
@@ -421,7 +397,7 @@ elif authentication_status:
                     y[:split]
                 )
 
-                predictions = model.predict(
+                preds = model.predict(
                     X[split:]
                 )
 
@@ -430,7 +406,7 @@ elif authentication_status:
                     round(
                         mean_absolute_error(
                             y[split:],
-                            predictions
+                            preds
                         ),
                         2
                     )
@@ -441,7 +417,7 @@ elif authentication_status:
                     round(
                         r2_score(
                             y[split:],
-                            predictions
+                            preds
                         ),
                         2
                     )
@@ -450,5 +426,5 @@ elif authentication_status:
     else:
 
         st.warning(
-            "Please select at least one stock."
+            "Select at least one stock"
         )
