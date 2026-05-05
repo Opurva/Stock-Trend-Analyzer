@@ -33,13 +33,16 @@ if "portfolio" not in st.session_state:
 
 
 # =====================================================
-# LOGIN
+# LOGIN SYSTEM
 # =====================================================
 if not st.session_state.logged_in:
 
     st.title("🔐 Login")
 
-    username = st.text_input("Username")
+    username = st.text_input(
+        "Username"
+    )
+
     password = st.text_input(
         "Password",
         type="password"
@@ -50,7 +53,9 @@ if not st.session_state.logged_in:
         "demo": "demo123"
     }
 
-    if st.button("Login"):
+    if st.button(
+        "Login"
+    ):
 
         if (
             username in users
@@ -78,7 +83,9 @@ st.sidebar.success(
     f"Welcome {st.session_state.username}"
 )
 
-if st.sidebar.button("Logout"):
+if st.sidebar.button(
+    "Logout"
+):
 
     st.session_state.logged_in = False
     st.session_state.username = None
@@ -87,7 +94,7 @@ if st.sidebar.button("Logout"):
 
 
 # =====================================================
-# APP TITLE
+# TITLE
 # =====================================================
 st.title(
     "📊 AI Stock Intelligence Platform"
@@ -106,7 +113,7 @@ logo_urls = {
 
 
 # =====================================================
-# SIDEBAR FILTERS
+# FILTERS
 # =====================================================
 stock_options = [
     "AAPL",
@@ -152,7 +159,7 @@ if len(selected_stocks) == 0:
 
 
 # =====================================================
-# FETCH DATA
+# FETCH STOCK DATA
 # =====================================================
 try:
 
@@ -183,7 +190,9 @@ if data.empty:
 
 if len(selected_stocks) == 1:
 
-    data = pd.DataFrame(data)
+    data = pd.DataFrame(
+        data
+    )
 
 
 # =====================================================
@@ -232,9 +241,7 @@ with tabs[0]:
         end=end_date,
         progress=False,
         auto_adjust=False
-    )
-
-    stock_df = stock_df.dropna()
+    ).dropna()
 
     if not stock_df.empty:
 
@@ -312,7 +319,7 @@ with tabs[1]:
     )
 
     st.subheader(
-        f"RSI - {indicator_stock}"
+        f"RSI Indicator - {indicator_stock}"
     )
 
     st.line_chart(
@@ -321,12 +328,12 @@ with tabs[1]:
 
 
 # =====================================================
-# TAB 3 : ANALYSIS
+# TAB 3 : BETTER ANALYSIS
 # =====================================================
 with tabs[2]:
 
     st.subheader(
-        "Trend Analysis"
+        "🧠 AI Trend Analysis"
     )
 
     for stock in selected_stocks:
@@ -345,23 +352,60 @@ with tabs[2]:
 
         returns = prices.pct_change()
 
-        volatility = returns.std()
+        volatility = (
+            returns.std() * 100
+        )
 
-        trend = "BUY"
+        if ma5 > ma20:
 
-        if ma5 < ma20:
-            trend = "SELL"
+            trend = "📈 Uptrend"
+            signal = "🟢 BUY"
 
-        risk = "High Risk"
+        else:
 
-        if volatility < 0.015:
-            risk = "Low Risk"
+            trend = "📉 Downtrend"
+            signal = "🔴 SELL"
 
-        elif volatility < 0.03:
-            risk = "Medium Risk"
+        if volatility < 1.5:
 
-        st.write(
-            f"{stock} | {trend} | {risk}"
+            risk = "🟢 Low"
+
+        elif volatility < 3:
+
+            risk = "🟡 Medium"
+
+        else:
+
+            risk = "🔴 High"
+
+        st.markdown("---")
+
+        st.markdown(
+            f"### {stock}"
+        )
+
+        c1, c2, c3, c4 = st.columns(
+            4
+        )
+
+        c1.metric(
+            "Trend",
+            trend
+        )
+
+        c2.metric(
+            "Risk",
+            risk
+        )
+
+        c3.metric(
+            "Signal",
+            signal
+        )
+
+        c4.metric(
+            "Volatility",
+            f"{round(volatility,2)}%"
         )
 
 
@@ -386,110 +430,76 @@ with tabs[3]:
         value=10000
     )
 
-    col1, col2 = st.columns(2)
+    if st.button(
+        "Add to Portfolio"
+    ):
 
-    with col1:
+        st.session_state.portfolio.append({
+            "stock": invest_stock,
+            "amount": invest_amount
+        })
 
-        if st.button(
-            "Add to Portfolio"
+    total = 0
+
+    for item in st.session_state.portfolio:
+
+        if not isinstance(
+            item,
+            dict
         ):
+            continue
 
-            st.session_state.portfolio.append({
-                "stock": invest_stock,
-                "amount": invest_amount
-            })
-
-            st.success(
-                "Added Successfully"
-            )
-
-    with col2:
-
-        if st.button(
-            "Clear Portfolio"
+        if (
+            "stock" not in item
+            or
+            "amount" not in item
         ):
+            continue
 
-            st.session_state.portfolio = []
-
-    total_value = 0
-
-    if len(
-        st.session_state.portfolio
-    ) == 0:
-
-        st.info(
-            "No investments yet."
+        stock = item.get(
+            "stock"
         )
 
-    else:
-
-        for item in st.session_state.portfolio:
-
-            if not isinstance(
-                item,
-                dict
-            ):
-                continue
-
-            if (
-                "stock" not in item
-                or
-                "amount" not in item
-            ):
-                continue
-
-            stock = item.get(
-                "stock"
-            )
-
-            amount = item.get(
-                "amount"
-            )
-
-            if stock not in data.columns:
-                continue
-
-            buy_price = data[
-                stock
-            ].iloc[0]
-
-            current_price = data[
-                stock
-            ].iloc[-1]
-
-            shares = (
-                amount / buy_price
-            )
-
-            current_value = (
-                shares * current_price
-            )
-
-            profit = (
-                current_value - amount
-            )
-
-            total_value += (
-                current_value
-            )
-
-            st.write(
-                f"{stock}: ₹{round(current_value,2)} | P/L: ₹{round(profit,2)}"
-            )
-
-        st.info(
-            f"Portfolio Value: ₹{round(total_value,2)}"
+        amount = item.get(
+            "amount"
         )
+
+        if stock not in data.columns:
+            continue
+
+        buy_price = data[
+            stock
+        ].iloc[0]
+
+        current_price = data[
+            stock
+        ].iloc[-1]
+
+        shares = amount / buy_price
+
+        current_value = (
+            shares * current_price
+        )
+
+        profit = (
+            current_value - amount
+        )
+
+        total += current_value
+
+        st.write(
+            f"{stock}: ₹{round(current_value,2)} | P/L ₹{round(profit,2)}"
+        )
+
+    st.info(
+        f"Portfolio Value: ₹{round(total,2)}"
+    )
 
 
 # =====================================================
 # TAB 5 : NEWS
 # =====================================================
 with tabs[4]:
-
-    st.subheader(
-        "News + Sentiment"
-    )
 
     news_stock = st.selectbox(
         "Select Stock",
@@ -542,12 +552,6 @@ with tabs[4]:
                 sentiment
             )
 
-            st.markdown(
-                f"[Read More]({article.get('url','#')})"
-            )
-
-            st.write("---")
-
     except:
 
         st.warning(
@@ -556,13 +560,9 @@ with tabs[4]:
 
 
 # =====================================================
-# TAB 6 : ML PREDICTION
+# TAB 6 : ML
 # =====================================================
 with tabs[5]:
-
-    st.subheader(
-        "ML Prediction"
-    )
 
     ml_stock = st.selectbox(
         "Select Stock",
@@ -574,13 +574,7 @@ with tabs[5]:
         ml_stock
     ].dropna().values
 
-    if len(prices) < 30:
-
-        st.warning(
-            "Not enough data."
-        )
-
-    else:
+    if len(prices) > 30:
 
         X = []
         y = []
@@ -598,8 +592,13 @@ with tabs[5]:
                 prices[i]
             )
 
-        X = np.array(X)
-        y = np.array(y)
+        X = np.array(
+            X
+        )
+
+        y = np.array(
+            y
+        )
 
         split = int(
             len(X) * 0.8
@@ -646,6 +645,7 @@ with tabs[5]:
             )
         )
 
+        # Future prediction
         last_window = list(
             prices[-5:]
         )
