@@ -17,116 +17,88 @@ from textblob import TextBlob
 # PAGE CONFIG
 # =====================================================
 st.set_page_config(
-    page_title="Stock Intelligence Platform",
+    page_title="AI Stock Intelligence Platform",
     layout="wide"
 )
 
 
 # =====================================================
-# USER FILE
+# USER AUTH
 # =====================================================
 USER_FILE = "users.json"
 
 
 def load_users():
 
-    if not os.path.exists(
-        USER_FILE
-    ):
+    if not os.path.exists(USER_FILE):
 
-        with open(
-            USER_FILE,
-            "w"
-        ) as f:
+        with open(USER_FILE, "w") as f:
 
-            json.dump(
-                {},
-                f
-            )
+            json.dump({}, f)
 
-    with open(
-        USER_FILE,
-        "r"
-    ) as f:
+    with open(USER_FILE, "r") as f:
 
-        return json.load(
-            f
-        )
+        return json.load(f)
 
 
-def save_users(
-    users
-):
+def save_users(users):
 
-    with open(
-        USER_FILE,
-        "w"
-    ) as f:
+    with open(USER_FILE, "w") as f:
 
-        json.dump(
-            users,
-            f
-        )
+        json.dump(users, f)
 
 
-# =====================================================
-# SESSION STATE
-# =====================================================
+# Session Auth
 if "logged_in" not in st.session_state:
+
     st.session_state.logged_in = False
 
 if "username" not in st.session_state:
+
     st.session_state.username = None
 
 if "portfolio" not in st.session_state:
+
     st.session_state.portfolio = []
 
 
 # =====================================================
-# LOGIN + SIGNUP
+# LOGIN / SIGNUP
 # =====================================================
 if not st.session_state.logged_in:
 
-    st.title(
-        "🔐 AI Stock Platform"
-    )
+    st.title("🔐 Stock Platform Authentication")
 
     auth_tabs = st.tabs([
         "Login",
         "Sign Up"
     ])
 
-
-    # ================= LOGIN =================
+    # LOGIN
     with auth_tabs[0]:
 
-        login_user = st.text_input(
+        username = st.text_input(
             "Username",
             key="login_user"
         )
 
-        login_pass = st.text_input(
+        password = st.text_input(
             "Password",
             type="password",
             key="login_pass"
         )
 
-        if st.button(
-            "Login"
-        ):
+        if st.button("Login"):
 
             users = load_users()
 
             if (
-                login_user in users
-                and users[
-                    login_user
-                ] == login_pass
+                username in users
+                and users[username] == password
             ):
 
                 st.session_state.logged_in = True
-
-                st.session_state.username = login_user
+                st.session_state.username = username
 
                 st.rerun()
 
@@ -136,44 +108,37 @@ if not st.session_state.logged_in:
                     "Invalid credentials"
                 )
 
-
-    # ================= SIGNUP =================
+    # SIGNUP
     with auth_tabs[1]:
 
-        signup_user = st.text_input(
-            "Choose Username",
+        new_user = st.text_input(
+            "Create Username",
             key="signup_user"
         )
 
-        signup_pass = st.text_input(
-            "Choose Password",
+        new_pass = st.text_input(
+            "Create Password",
             type="password",
             key="signup_pass"
         )
 
-        if st.button(
-            "Create Account"
-        ):
+        if st.button("Create Account"):
 
             users = load_users()
 
-            if signup_user in users:
+            if new_user in users:
 
                 st.error(
                     "Username already exists"
                 )
 
-            elif len(
-                signup_user
-            ) < 3:
+            elif len(new_user) < 3:
 
                 st.error(
                     "Username too short"
                 )
 
-            elif len(
-                signup_pass
-            ) < 4:
+            elif len(new_pass) < 4:
 
                 st.error(
                     "Password too short"
@@ -181,13 +146,9 @@ if not st.session_state.logged_in:
 
             else:
 
-                users[
-                    signup_user
-                ] = signup_pass
+                users[new_user] = new_pass
 
-                save_users(
-                    users
-                )
+                save_users(users)
 
                 st.success(
                     "Account created successfully!"
@@ -203,9 +164,7 @@ st.sidebar.success(
     f"Welcome {st.session_state.username}"
 )
 
-if st.sidebar.button(
-    "Logout"
-):
+if st.sidebar.button("Logout"):
 
     st.session_state.logged_in = False
     st.session_state.username = None
@@ -216,9 +175,7 @@ if st.sidebar.button(
 # =====================================================
 # TITLE
 # =====================================================
-st.title(
-    "📊 AI Stock Intelligence Platform"
-)
+st.title("📊 AI Stock Intelligence Platform")
 
 
 # =====================================================
@@ -226,9 +183,7 @@ st.title(
 # =====================================================
 logo_urls = {
     "AAPL": "https://companieslogo.com/img/orig/AAPL-bf1a4314.png",
-    "MSFT": "https://companieslogo.com/img/orig/MSFT-a203b22d.png",
-    "GOOGL": "https://companieslogo.com/img/orig/GOOGL-0ed88f7c.png",
-    "TSLA": "https://companieslogo.com/img/orig/TSLA-6da550e8.png"
+    "MSFT": "https://companieslogo.com/img/orig/MSFT-a203b22d.png"
 }
 
 
@@ -281,18 +236,36 @@ if len(selected_stocks) == 0:
 # =====================================================
 # FETCH DATA
 # =====================================================
-data = yf.download(
-    selected_stocks,
-    start=start_date,
-    end=end_date,
-    progress=False
-)["Close"]
+try:
+
+    data = yf.download(
+        selected_stocks,
+        start=start_date,
+        end=end_date,
+        progress=False
+    )["Close"]
+
+except:
+
+    st.error(
+        "Unable to fetch data."
+    )
+
+    st.stop()
+
+
+if data.empty:
+
+    st.error(
+        "No stock data found."
+    )
+
+    st.stop()
+
 
 if len(selected_stocks) == 1:
 
-    data = pd.DataFrame(
-        data
-    )
+    data = pd.DataFrame(data)
 
 
 # =====================================================
@@ -309,22 +282,22 @@ tabs = st.tabs([
 
 
 # =====================================================
-# CHARTS
+# TAB 1 : CHARTS
 # =====================================================
 with tabs[0]:
 
-    stock = st.selectbox(
+    chart_stock = st.selectbox(
         "Select Stock",
         selected_stocks,
         key="chart"
     )
 
-    if stock in logo_urls:
+    if chart_stock in logo_urls:
 
         try:
 
             st.image(
-                logo_urls[stock],
+                logo_urls[chart_stock],
                 width=80
             )
 
@@ -332,12 +305,16 @@ with tabs[0]:
             pass
 
     stock_df = yf.download(
-        stock,
+        chart_stock,
         start=start_date,
         end=end_date,
         progress=False,
         auto_adjust=False
     ).dropna()
+
+    st.subheader(
+        "Candlestick Chart"
+    )
 
     if not stock_df.empty:
 
@@ -362,24 +339,38 @@ with tabs[0]:
             use_container_width=True
         )
 
+    st.subheader(
+        "Price Comparison"
+    )
+
     st.line_chart(
         data
     )
 
+    normalized = data / data.iloc[0] * 100
+
+    st.subheader(
+        "Performance Comparison"
+    )
+
+    st.line_chart(
+        normalized
+    )
+
 
 # =====================================================
-# RSI
+# TAB 2 : RSI
 # =====================================================
 with tabs[1]:
 
-    stock = st.selectbox(
-        "RSI Stock",
+    rsi_stock = st.selectbox(
+        "Select Stock",
         selected_stocks,
         key="rsi"
     )
 
     prices = data[
-        stock
+        rsi_stock
     ]
 
     delta = prices.diff()
@@ -398,18 +389,22 @@ with tabs[1]:
         100 / (1 + rs)
     )
 
+    st.subheader(
+        f"RSI : {rsi_stock}"
+    )
+
     st.line_chart(
         rsi
     )
 
 
 # =====================================================
-# ANALYSIS
+# TAB 3 : ANALYSIS
 # =====================================================
 with tabs[2]:
 
     st.subheader(
-        "AI Analysis"
+        "AI Trend Analysis"
     )
 
     for stock in selected_stocks:
@@ -426,28 +421,46 @@ with tabs[2]:
             20
         ).mean().iloc[-1]
 
+        returns = prices.pct_change()
+
+        volatility = returns.std()
+
         if ma5 > ma20:
 
-            st.success(
-                f"{stock}: BUY"
-            )
+            trend = "📈 Uptrend"
+            signal = "🟢 BUY"
 
         else:
 
-            st.error(
-                f"{stock}: SELL"
-            )
+            trend = "📉 Downtrend"
+            signal = "🔴 SELL"
+
+        if volatility < 0.015:
+
+            risk = "Low Risk"
+
+        elif volatility < 0.03:
+
+            risk = "Medium Risk"
+
+        else:
+
+            risk = "High Risk"
+
+        st.info(
+            f"{stock} | {trend} | {risk} | {signal}"
+        )
 
 
 # =====================================================
-# PORTFOLIO
+# TAB 4 : PORTFOLIO
 # =====================================================
 with tabs[3]:
 
     stock = st.selectbox(
-        "Portfolio Stock",
+        "Select Stock",
         selected_stocks,
-        key="portfolio"
+        key="portfolio_stock"
     )
 
     amount = st.number_input(
@@ -465,6 +478,8 @@ with tabs[3]:
             "amount": amount
         })
 
+    total_value = 0
+
     for item in st.session_state.portfolio:
 
         if not isinstance(
@@ -473,18 +488,57 @@ with tabs[3]:
         ):
             continue
 
-        st.write(
-            item
+        stock = item.get(
+            "stock"
         )
+
+        amount = item.get(
+            "amount"
+        )
+
+        if stock not in data.columns:
+            continue
+
+        buy_price = data[
+            stock
+        ].iloc[0]
+
+        current_price = data[
+            stock
+        ].iloc[-1]
+
+        shares = amount / buy_price
+
+        current_value = shares * current_price
+
+        profit = current_value - amount
+
+        total_value += current_value
+
+        if profit >= 0:
+
+            st.success(
+                f"{stock}: ₹{round(current_value,2)} (+₹{round(profit,2)})"
+            )
+
+        else:
+
+            st.error(
+                f"{stock}: ₹{round(current_value,2)} (-₹{abs(round(profit,2))})"
+            )
+
+    st.info(
+        f"Portfolio Value: ₹{round(total_value,2)}"
+    )
 
 
 # =====================================================
-# NEWS
+# TAB 5 : NEWS
 # =====================================================
 with tabs[4]:
 
-    stock = st.selectbox(
-        "News Stock",
+    news_stock = st.selectbox(
+        "Select Stock",
         selected_stocks,
         key="news"
     )
@@ -493,7 +547,7 @@ with tabs[4]:
 
     url = (
         f"https://newsapi.org/v2/everything?"
-        f"q={stock}&apiKey={api_key}"
+        f"q={news_stock}&apiKey={api_key}"
     )
 
     try:
@@ -518,13 +572,17 @@ with tabs[4]:
                 title
             ).sentiment.polarity
 
-            sentiment = "⚪ Neutral"
-
             if polarity > 0:
+
                 sentiment = "🟢 Positive"
 
             elif polarity < 0:
+
                 sentiment = "🔴 Negative"
+
+            else:
+
+                sentiment = "⚪ Neutral"
 
             st.markdown(
                 f"### {title}"
@@ -534,6 +592,8 @@ with tabs[4]:
                 sentiment
             )
 
+            st.write("---")
+
     except:
 
         st.warning(
@@ -542,23 +602,27 @@ with tabs[4]:
 
 
 # =====================================================
-# ML
+# TAB 6 : ML
 # =====================================================
 with tabs[5]:
 
-    stock = st.selectbox(
-        "ML Stock",
+    ml_stock = st.selectbox(
+        "Select Stock",
         selected_stocks,
         key="ml"
     )
 
     prices = data[
-        stock
+        ml_stock
     ].dropna().values
 
-    if len(
-        prices
-    ) > 30:
+    if len(prices) < 30:
+
+        st.warning(
+            "Not enough data."
+        )
+
+    else:
 
         X = []
         y = []
@@ -589,6 +653,7 @@ with tabs[5]:
         )
 
         model = RandomForestRegressor(
+            n_estimators=100,
             random_state=42
         )
 
@@ -601,24 +666,52 @@ with tabs[5]:
             X[split:]
         )
 
-        st.write(
-            "MAE:",
-            round(
-                mean_absolute_error(
-                    y[split:],
-                    predictions
-                ),
-                2
-            )
+        mae = mean_absolute_error(
+            y[split:],
+            predictions
+        )
+
+        r2 = r2_score(
+            y[split:],
+            predictions
         )
 
         st.write(
-            "R²:",
-            round(
-                r2_score(
-                    y[split:],
-                    predictions
-                ),
-                2
+            f"MAE: {round(mae,2)}"
+        )
+
+        st.write(
+            f"R²: {round(r2,2)}"
+        )
+
+        # Future Prediction
+        last_window = list(
+            prices[-5:]
+        )
+
+        future_preds = []
+
+        for _ in range(30):
+
+            pred = model.predict(
+                [last_window]
+            )[0]
+
+            future_preds.append(
+                pred
             )
+
+            last_window.pop(0)
+            last_window.append(pred)
+
+        st.subheader(
+            "30 Days Forecast"
+        )
+
+        forecast_df = pd.DataFrame({
+            "Predicted Price": future_preds
+        })
+
+        st.line_chart(
+            forecast_df
         )
