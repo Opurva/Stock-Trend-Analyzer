@@ -32,39 +32,39 @@ if "portfolio" not in st.session_state:
     st.session_state.portfolio = []
 
 
-# ---------------- LOGIN PAGE ----------------
 if not st.session_state.logged_in:
 
-    st.title("🔐 Stock Platform Login")
+    st.title("🔐 Login")
 
     username = st.text_input("Username")
+
     password = st.text_input(
         "Password",
         type="password"
     )
 
-    valid_users = {
+    users = {
         "opurva": "12345",
-        "demo": "demo123",
-        "vasu": "Glitterydihh69"
+        "demo": "demo123"
     }
 
     if st.button("Login"):
 
         if (
-            username in valid_users
-            and valid_users[username] == password
+            username in users
+            and users[username] == password
         ):
 
             st.session_state.logged_in = True
             st.session_state.current_user = username
 
-            st.success("Login Successful")
             st.rerun()
 
         else:
 
-            st.error("Invalid username or password")
+            st.error(
+                "Invalid Credentials"
+            )
 
     st.stop()
 
@@ -72,24 +72,24 @@ if not st.session_state.logged_in:
 # =====================================================
 # SIDEBAR
 # =====================================================
-with st.sidebar:
+st.sidebar.success(
+    f"Welcome {st.session_state.current_user}"
+)
 
-    st.success(
-        f"Welcome {st.session_state.current_user}"
-    )
+if st.sidebar.button("Logout"):
 
-    if st.button("Logout"):
+    st.session_state.logged_in = False
+    st.session_state.current_user = None
 
-        st.session_state.logged_in = False
-        st.session_state.current_user = None
-
-        st.rerun()
+    st.rerun()
 
 
 # =====================================================
-# MAIN APP
+# TITLE
 # =====================================================
-st.title("📊 AI Stock Intelligence Platform")
+st.title(
+    "📊 AI Stock Intelligence Platform"
+)
 
 
 # =====================================================
@@ -104,9 +104,11 @@ logo_urls = {
 
 
 # =====================================================
-# STOCK FILTERS
+# FILTERS
 # =====================================================
-st.sidebar.header("Stock Filters")
+st.sidebar.header(
+    "Stock Filters"
+)
 
 stock_options = [
     "AAPL",
@@ -138,33 +140,27 @@ end_date = st.sidebar.date_input(
 )
 
 
-# =====================================================
-# DATA FETCH
-# =====================================================
 if len(selected_stocks) == 0:
 
     st.warning(
-        "Please select at least one stock."
+        "Select at least one stock"
     )
 
     st.stop()
 
-try:
 
-    data = yf.download(
-        selected_stocks,
-        start=start_date,
-        end=end_date,
-        progress=False
-    )["Close"]
+# =====================================================
+# FETCH DATA
+# =====================================================
+data = yf.download(
+    selected_stocks,
+    start=start_date,
+    end=end_date,
+    progress=False
+)["Close"]
 
-except:
-
-    st.error(
-        "Unable to fetch stock data."
-    )
-
-    st.stop()
+if len(selected_stocks) == 1:
+    data = pd.DataFrame(data)
 
 if data.empty:
 
@@ -173,10 +169,6 @@ if data.empty:
     )
 
     st.stop()
-
-if len(selected_stocks) == 1:
-
-    data = pd.DataFrame(data)
 
 
 # =====================================================
@@ -193,39 +185,33 @@ tabs = st.tabs([
 
 
 # =====================================================
-# TAB 1 : CHARTS
+# TAB 1
 # =====================================================
 with tabs[0]:
 
-    st.subheader("Stock Charts")
-
-    chart_stock = st.selectbox(
+    stock = st.selectbox(
         "Select Stock",
         selected_stocks,
         key="chart"
     )
 
-    if chart_stock in logo_urls:
+    if stock in logo_urls:
 
         try:
-
             st.image(
-                logo_urls[chart_stock],
+                logo_urls[stock],
                 width=80
             )
-
         except:
             pass
 
     stock_df = yf.download(
-        chart_stock,
+        stock,
         start=start_date,
         end=end_date,
         progress=False,
         auto_adjust=False
-    )
-
-    stock_df = stock_df.dropna()
+    ).dropna()
 
     if not stock_df.empty:
 
@@ -250,18 +236,32 @@ with tabs[0]:
             use_container_width=True
         )
 
-    st.subheader("Price Comparison")
+    st.subheader(
+        "Price Comparison"
+    )
 
     st.line_chart(data)
 
+    st.subheader(
+        "Performance Comparison"
+    )
+
+    normalized = (
+        data / data.iloc[0]
+    ) * 100
+
+    st.line_chart(
+        normalized
+    )
+
 
 # =====================================================
-# TAB 2 : RSI
+# TAB 2
 # =====================================================
 with tabs[1]:
 
     stock = st.selectbox(
-        "Select Stock",
+        "RSI Stock",
         selected_stocks,
         key="rsi"
     )
@@ -284,19 +284,15 @@ with tabs[1]:
         100 / (1 + rs)
     )
 
-    st.subheader(
-        f"RSI - {stock}"
+    st.line_chart(
+        rsi
     )
 
-    st.line_chart(rsi)
-
 
 # =====================================================
-# TAB 3 : ANALYSIS
+# TAB 3
 # =====================================================
 with tabs[2]:
-
-    st.subheader("Trend Analysis")
 
     for stock in selected_stocks:
 
@@ -306,28 +302,42 @@ with tabs[2]:
 
         ma20 = prices.rolling(20).mean().iloc[-1]
 
+        returns = prices.pct_change()
+
+        volatility = returns.std()
+
         if ma5 > ma20:
 
-            st.success(
-                f"{stock}: BUY Signal"
-            )
+            trend = "BUY"
 
         else:
 
-            st.error(
-                f"{stock}: SELL Signal"
-            )
+            trend = "SELL"
+
+        if volatility < 0.015:
+
+            risk = "Low Risk"
+
+        elif volatility < 0.03:
+
+            risk = "Medium Risk"
+
+        else:
+
+            risk = "High Risk"
+
+        st.write(
+            f"{stock} | {trend} | {risk}"
+        )
 
 
 # =====================================================
-# TAB 4 : PORTFOLIO
+# TAB 4
 # =====================================================
 with tabs[3]:
 
-    st.subheader("Portfolio")
-
     stock = st.selectbox(
-        "Select Stock",
+        "Portfolio Stock",
         selected_stocks,
         key="portfolio"
     )
@@ -338,35 +348,53 @@ with tabs[3]:
         value=10000
     )
 
-    if st.button("Add to Portfolio"):
+    if st.button(
+        "Add to Portfolio"
+    ):
 
         st.session_state.portfolio.append({
             "stock": stock,
             "amount": amount
         })
 
-        st.success(
-            "Added Successfully"
-        )
-
-    if st.button("Clear Portfolio"):
-
-        st.session_state.portfolio = []
+    total = 0
 
     for item in st.session_state.portfolio:
 
-        st.write(item)
+        stock = item["stock"]
+
+        amount = item["amount"]
+
+        buy_price = data[stock].iloc[0]
+
+        current_price = data[stock].iloc[-1]
+
+        shares = amount / buy_price
+
+        current_value = shares * current_price
+
+        profit = current_value - amount
+
+        total += current_value
+
+        st.write(
+            stock,
+            round(current_value, 2),
+            round(profit, 2)
+        )
+
+    st.info(
+        f"Portfolio Value: ₹{round(total,2)}"
+    )
 
 
 # =====================================================
-# TAB 5 : NEWS
+# TAB 5
 # =====================================================
 with tabs[4]:
 
-    st.subheader("Stock News")
-
-    news_stock = st.selectbox(
-        "Select Stock",
+    stock = st.selectbox(
+        "News Stock",
         selected_stocks,
         key="news"
     )
@@ -375,12 +403,14 @@ with tabs[4]:
 
     url = (
         f"https://newsapi.org/v2/everything?"
-        f"q={news_stock}&apiKey={api_key}"
+        f"q={stock}&apiKey={api_key}"
     )
 
     try:
 
-        response = requests.get(url)
+        response = requests.get(
+            url
+        )
 
         articles = response.json().get(
             "articles",
@@ -418,6 +448,12 @@ with tabs[4]:
                 sentiment
             )
 
+            st.markdown(
+                f"[Read More]({article.get('url','#')})"
+            )
+
+            st.write("---")
+
     except:
 
         st.warning(
@@ -426,16 +462,12 @@ with tabs[4]:
 
 
 # =====================================================
-# TAB 6 : ML PREDICTION
+# TAB 6
 # =====================================================
 with tabs[5]:
 
-    st.subheader(
-        "ML Prediction"
-    )
-
     stock = st.selectbox(
-        "Select Stock",
+        "ML Stock",
         selected_stocks,
         key="ml"
     )
@@ -447,7 +479,7 @@ with tabs[5]:
     if len(prices) < 30:
 
         st.warning(
-            "Not enough data."
+            "Not enough data"
         )
 
     else:
@@ -469,6 +501,7 @@ with tabs[5]:
             )
 
         X = np.array(X)
+
         y = np.array(y)
 
         split = int(
@@ -476,9 +509,11 @@ with tabs[5]:
         )
 
         X_train = X[:split]
+
         X_test = X[split:]
 
         y_train = y[:split]
+
         y_test = y[split:]
 
         model = RandomForestRegressor(
@@ -494,20 +529,59 @@ with tabs[5]:
             X_test
         )
 
-        mae = mean_absolute_error(
-            y_test,
-            predictions
-        )
-
-        r2 = r2_score(
-            y_test,
-            predictions
+        st.write(
+            "MAE:",
+            round(
+                mean_absolute_error(
+                    y_test,
+                    predictions
+                ),
+                2
+            )
         )
 
         st.write(
-            f"MAE: {round(mae,2)}"
+            "R²:",
+            round(
+                r2_score(
+                    y_test,
+                    predictions
+                ),
+                2
+            )
         )
 
-        st.write(
-            f"R² Score: {round(r2,2)}"
+        # Future Forecast
+        last_window = list(
+            prices[-5:]
+        )
+
+        future_preds = []
+
+        for _ in range(30):
+
+            pred = model.predict(
+                [last_window]
+            )[0]
+
+            future_preds.append(
+                pred
+            )
+
+            last_window.pop(0)
+
+            last_window.append(
+                pred
+            )
+
+        future_df = pd.DataFrame({
+            "Predicted Price": future_preds
+        })
+
+        st.subheader(
+            "Next 30 Days Forecast"
+        )
+
+        st.line_chart(
+            future_df
         )
