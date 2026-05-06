@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 
 import json
 import os
+import hashlib
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
@@ -23,9 +24,15 @@ st.set_page_config(
 
 
 # =====================================================
-# USER AUTH
+# USER AUTH DATABASE
 # =====================================================
 USER_FILE = "users.json"
+
+
+def hash_password(password):
+    return hashlib.sha256(
+        password.encode()
+    ).hexdigest()
 
 
 def load_users():
@@ -36,19 +43,31 @@ def load_users():
 
             json.dump({}, f)
 
-    with open(USER_FILE, "r") as f:
+    try:
 
-        return json.load(f)
+        with open(USER_FILE, "r") as f:
+
+            return json.load(f)
+
+    except:
+
+        return {}
 
 
 def save_users(users):
 
     with open(USER_FILE, "w") as f:
 
-        json.dump(users, f)
+        json.dump(
+            users,
+            f,
+            indent=4
+        )
 
 
-# Session Auth
+# =====================================================
+# SESSION STATE
+# =====================================================
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
@@ -74,15 +93,16 @@ if not st.session_state.logged_in:
         "Sign Up"
     ])
 
+
     # LOGIN
     with auth_tabs[0]:
 
-        username = st.text_input(
+        login_user = st.text_input(
             "Username",
             key="login_user"
         )
 
-        password = st.text_input(
+        login_pass = st.text_input(
             "Password",
             type="password",
             key="login_pass"
@@ -93,30 +113,36 @@ if not st.session_state.logged_in:
             users = load_users()
 
             if (
-                username in users
-                and users[username] == password
+                login_user in users
+                and users[login_user] == hash_password(login_pass)
             ):
 
                 st.session_state.logged_in = True
-                st.session_state.username = username
+
+                st.session_state.username = login_user
+
+                st.success(
+                    "Login Successful"
+                )
 
                 st.rerun()
 
             else:
 
                 st.error(
-                    "Invalid credentials"
+                    "Invalid username or password"
                 )
+
 
     # SIGNUP
     with auth_tabs[1]:
 
-        new_user = st.text_input(
+        signup_user = st.text_input(
             "Create Username",
             key="signup_user"
         )
 
-        new_pass = st.text_input(
+        signup_pass = st.text_input(
             "Create Password",
             type="password",
             key="signup_pass"
@@ -126,29 +152,35 @@ if not st.session_state.logged_in:
 
             users = load_users()
 
-            if new_user in users:
-
-                st.error(
-                    "Username already exists"
-                )
-
-            elif len(new_user) < 3:
+            if len(signup_user) < 3:
 
                 st.error(
                     "Username too short"
                 )
 
-            elif len(new_pass) < 4:
+            elif len(signup_pass) < 4:
 
                 st.error(
                     "Password too short"
                 )
 
+            elif signup_user in users:
+
+                st.error(
+                    "Username already exists"
+                )
+
             else:
 
-                users[new_user] = new_pass
+                users[
+                    signup_user
+                ] = hash_password(
+                    signup_pass
+                )
 
-                save_users(users)
+                save_users(
+                    users
+                )
 
                 st.success(
                     "Account created successfully!"
@@ -158,7 +190,7 @@ if not st.session_state.logged_in:
 
 
 # =====================================================
-# SIDEBAR
+# SIDEBAR USER
 # =====================================================
 st.sidebar.success(
     f"Welcome {st.session_state.username}"
@@ -167,6 +199,7 @@ st.sidebar.success(
 if st.sidebar.button("Logout"):
 
     st.session_state.logged_in = False
+
     st.session_state.username = None
 
     st.rerun()
@@ -248,7 +281,7 @@ try:
 except:
 
     st.error(
-        "Unable to fetch data."
+        "Unable to fetch stock data."
     )
 
     st.stop()
@@ -302,6 +335,7 @@ with tabs[0]:
             )
 
         except:
+
             pass
 
     stock_df = yf.download(
@@ -313,7 +347,7 @@ with tabs[0]:
     ).dropna()
 
     st.subheader(
-        "Candlestick Chart"
+        "🕯 Candlestick Chart"
     )
 
     if not stock_df.empty:
@@ -340,7 +374,7 @@ with tabs[0]:
         )
 
     st.subheader(
-        "Price Comparison"
+        "📈 Price Comparison"
     )
 
     st.line_chart(
@@ -350,7 +384,7 @@ with tabs[0]:
     normalized = data / data.iloc[0] * 100
 
     st.subheader(
-        "Performance Comparison"
+        "⚖ Performance Comparison"
     )
 
     st.line_chart(
@@ -404,7 +438,7 @@ with tabs[1]:
 with tabs[2]:
 
     st.subheader(
-        "AI Trend Analysis"
+        "🧠 AI Trend Analysis"
     )
 
     for stock in selected_stocks:
@@ -437,15 +471,15 @@ with tabs[2]:
 
         if volatility < 0.015:
 
-            risk = "Low Risk"
+            risk = "🟢 Low Risk"
 
         elif volatility < 0.03:
 
-            risk = "Medium Risk"
+            risk = "🟡 Medium Risk"
 
         else:
 
-            risk = "High Risk"
+            risk = "🔴 High Risk"
 
         st.info(
             f"{stock} | {trend} | {risk} | {signal}"
@@ -457,7 +491,7 @@ with tabs[2]:
 # =====================================================
 with tabs[3]:
 
-    stock = st.selectbox(
+    stock_choice = st.selectbox(
         "Select Stock",
         selected_stocks,
         key="portfolio_stock"
@@ -474,7 +508,7 @@ with tabs[3]:
     ):
 
         st.session_state.portfolio.append({
-            "stock": stock,
+            "stock": stock_choice,
             "amount": amount
         })
 
@@ -684,7 +718,6 @@ with tabs[5]:
             f"R²: {round(r2,2)}"
         )
 
-        # Future Prediction
         last_window = list(
             prices[-5:]
         )
@@ -702,15 +735,16 @@ with tabs[5]:
             )
 
             last_window.pop(0)
-            last_window.append(pred)
 
-        st.subheader(
-            "30 Days Forecast"
-        )
+            last_window.append(pred)
 
         forecast_df = pd.DataFrame({
             "Predicted Price": future_preds
         })
+
+        st.subheader(
+            "📈 30 Days Forecast"
+        )
 
         st.line_chart(
             forecast_df
