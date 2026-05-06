@@ -201,6 +201,28 @@ if not st.session_state.logged_in:
 st.sidebar.success(
     f"Welcome {st.session_state.username}"
 )
+if st.sidebar.checkbox("Show Registered Users"):
+
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, username FROM users"
+    )
+
+    users = cursor.fetchall()
+
+    st.sidebar.write(
+        "Registered Users:"
+    )
+
+    for user in users:
+
+        st.sidebar.write(
+            f"ID: {user[0]} | {user[1]}"
+        )
+
+    conn.close()
 
 if st.sidebar.button("Logout"):
 
