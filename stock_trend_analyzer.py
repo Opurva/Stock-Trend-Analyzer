@@ -201,28 +201,37 @@ if not st.session_state.logged_in:
 st.sidebar.success(
     f"Welcome {st.session_state.username}"
 )
-if st.sidebar.checkbox("Show Registered Users"):
+# Admin Panel (only visible to admin)
 
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+if st.session_state.username.lower() == "opurva":
 
-    cursor.execute(
-        "SELECT id, username FROM users"
-    )
+    if st.sidebar.checkbox(
+        "Admin Panel"
+    ):
 
-    users = cursor.fetchall()
-
-    st.sidebar.write(
-        "Registered Users:"
-    )
-
-    for user in users:
-
-        st.sidebar.write(
-            f"ID: {user[0]} | {user[1]}"
+        conn = sqlite3.connect(
+            DB_NAME
         )
 
-    conn.close()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id, username FROM users"
+        )
+
+        users = cursor.fetchall()
+
+        st.sidebar.write(
+            "Registered Users"
+        )
+
+        for user in users:
+
+            st.sidebar.write(
+                f"ID: {user[0]} | {user[1]}"
+            )
+
+        conn.close()
 
 if st.sidebar.button("Logout"):
 
