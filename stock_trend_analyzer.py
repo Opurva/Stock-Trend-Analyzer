@@ -4,9 +4,7 @@ import pandas as pd
 import requests
 import numpy as np
 import plotly.graph_objects as go
-
-import json
-import os
+import sqlite3
 import hashlib
 
 from sklearn.ensemble import RandomForestRegressor
@@ -24,60 +22,78 @@ st.set_page_config(
 
 
 # =====================================================
-# USER AUTH DATABASE
+# SQLITE DATABASE
 # =====================================================
-USER_FILE = "users.json"
+DB_NAME = "users.db"
 
 
 def hash_password(password):
-    return hashlib.sha256(
-        password.encode()
-    ).hexdigest()
+    return hashlib.sha256(password.encode()).hexdigest()
 
 
-def load_users():
+def create_users_table():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
 
-    if not os.path.exists(USER_FILE):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT
+        )
+    """)
 
-        with open(USER_FILE, "w") as f:
+    conn.commit()
+    conn.close()
 
-            json.dump({}, f)
+
+def signup_user(username, password):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
 
     try:
-
-        with open(USER_FILE, "r") as f:
-
-            return json.load(f)
-
-    except:
-
-        return {}
-
-
-def save_users(users):
-
-    with open(USER_FILE, "w") as f:
-
-        json.dump(
-            users,
-            f,
-            indent=4
+        cursor.execute(
+            "INSERT INTO users(username,password) VALUES (?,?)",
+            (username, hash_password(password))
         )
 
+        conn.commit()
+        conn.close()
+        return True
+
+    except:
+        conn.close()
+        return False
+
+
+def login_user(username, password):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM users WHERE username=? AND password=?",
+        (username, hash_password(password))
+    )
+
+    user = cursor.fetchone()
+    conn.close()
+
+    return user
+
+
+create_users_table()
+
 
 # =====================================================
-# SESSION STATE
+# SESSION
 # =====================================================
 if "logged_in" not in st.session_state:
-
     st.session_state.logged_in = False
 
 if "username" not in st.session_state:
-
     st.session_state.username = None
 
 if "portfolio" not in st.session_state:
-
     st.session_state.portfolio = []
 
 
@@ -93,16 +109,14 @@ if not st.session_state.logged_in:
         "Sign Up"
     ])
 
-
-    # LOGIN
     with auth_tabs[0]:
 
-        login_user = st.text_input(
+        username = st.text_input(
             "Username",
             key="login_user"
         )
 
-        login_pass = st.text_input(
+        password = st.text_input(
             "Password",
             type="password",
             key="login_pass"
@@ -110,16 +124,15 @@ if not st.session_state.logged_in:
 
         if st.button("Login"):
 
-            users = load_users()
+            user = login_user(
+                username,
+                password
+            )
 
-            if (
-                login_user in users
-                and users[login_user] == hash_password(login_pass)
-            ):
+            if user:
 
                 st.session_state.logged_in = True
-
-                st.session_state.username = login_user
+                st.session_state.username = username
 
                 st.success(
                     "Login Successful"
@@ -130,19 +143,17 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    "Invalid username or password"
+                    "Invalid credentials"
                 )
 
-
-    # SIGNUP
     with auth_tabs[1]:
 
-        signup_user = st.text_input(
+        new_user = st.text_input(
             "Create Username",
             key="signup_user"
         )
 
-        signup_pass = st.text_input(
+        new_pass = st.text_input(
             "Create Password",
             type="password",
             key="signup_pass"
@@ -150,41 +161,36 @@ if not st.session_state.logged_in:
 
         if st.button("Create Account"):
 
-            users = load_users()
-
-            if len(signup_user) < 3:
+            if len(new_user) < 3:
 
                 st.error(
                     "Username too short"
                 )
 
-            elif len(signup_pass) < 4:
+            elif len(new_pass) < 4:
 
                 st.error(
                     "Password too short"
                 )
 
-            elif signup_user in users:
-
-                st.error(
-                    "Username already exists"
-                )
-
             else:
 
-                users[
-                    signup_user
-                ] = hash_password(
-                    signup_pass
+                created = signup_user(
+                    new_user,
+                    new_pass
                 )
 
-                save_users(
-                    users
-                )
+                if created:
 
-                st.success(
-                    "Account created successfully!"
-                )
+                    st.success(
+                        "Account created successfully"
+                    )
+
+                else:
+
+                    st.error(
+                        "Username already exists"
+                    )
 
     st.stop()
 
@@ -199,7 +205,6 @@ st.sidebar.success(
 if st.sidebar.button("Logout"):
 
     st.session_state.logged_in = False
-
     st.session_state.username = None
 
     st.rerun()
@@ -315,7 +320,7 @@ tabs = st.tabs([
 
 
 # =====================================================
-# TAB 1 : CHARTS
+# TAB 1
 # =====================================================
 with tabs[0]:
 
@@ -328,14 +333,11 @@ with tabs[0]:
     if chart_stock in logo_urls:
 
         try:
-
             st.image(
                 logo_urls[chart_stock],
                 width=80
             )
-
         except:
-
             pass
 
     stock_df = yf.download(
@@ -345,10 +347,6 @@ with tabs[0]:
         progress=False,
         auto_adjust=False
     ).dropna()
-
-    st.subheader(
-        "🕯 Candlestick Chart"
-    )
 
     if not stock_df.empty:
 
@@ -373,27 +371,11 @@ with tabs[0]:
             use_container_width=True
         )
 
-    st.subheader(
-        "📈 Price Comparison"
-    )
-
-    st.line_chart(
-        data
-    )
-
-    normalized = data / data.iloc[0] * 100
-
-    st.subheader(
-        "⚖ Performance Comparison"
-    )
-
-    st.line_chart(
-        normalized
-    )
+    st.line_chart(data)
 
 
 # =====================================================
-# TAB 2 : RSI
+# TAB 2
 # =====================================================
 with tabs[1]:
 
@@ -403,82 +385,41 @@ with tabs[1]:
         key="rsi"
     )
 
-    prices = data[
-        rsi_stock
-    ]
+    prices = data[rsi_stock]
 
     delta = prices.diff()
-
-    gain = delta.clip(
-        lower=0
-    ).rolling(14).mean()
-
-    loss = -delta.clip(
-        upper=0
-    ).rolling(14).mean()
+    gain = delta.clip(lower=0).rolling(14).mean()
+    loss = -delta.clip(upper=0).rolling(14).mean()
 
     rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
 
-    rsi = 100 - (
-        100 / (1 + rs)
-    )
-
-    st.subheader(
-        f"RSI : {rsi_stock}"
-    )
-
-    st.line_chart(
-        rsi
-    )
+    st.line_chart(rsi)
 
 
 # =====================================================
-# TAB 3 : ANALYSIS
+# TAB 3
 # =====================================================
 with tabs[2]:
 
-    st.subheader(
-        "🧠 AI Trend Analysis"
-    )
-
     for stock in selected_stocks:
 
-        prices = data[
-            stock
-        ]
+        prices = data[stock]
 
-        ma5 = prices.rolling(
-            5
-        ).mean().iloc[-1]
-
-        ma20 = prices.rolling(
-            20
-        ).mean().iloc[-1]
+        ma5 = prices.rolling(5).mean().iloc[-1]
+        ma20 = prices.rolling(20).mean().iloc[-1]
 
         returns = prices.pct_change()
-
         volatility = returns.std()
 
-        if ma5 > ma20:
-
-            trend = "📈 Uptrend"
-            signal = "🟢 BUY"
-
-        else:
-
-            trend = "📉 Downtrend"
-            signal = "🔴 SELL"
+        trend = "📈 Uptrend" if ma5 > ma20 else "📉 Downtrend"
+        signal = "🟢 BUY" if ma5 > ma20 else "🔴 SELL"
 
         if volatility < 0.015:
-
             risk = "🟢 Low Risk"
-
         elif volatility < 0.03:
-
             risk = "🟡 Medium Risk"
-
         else:
-
             risk = "🔴 High Risk"
 
         st.info(
@@ -487,7 +428,7 @@ with tabs[2]:
 
 
 # =====================================================
-# TAB 4 : PORTFOLIO
+# TAB 4
 # =====================================================
 with tabs[3]:
 
@@ -503,9 +444,7 @@ with tabs[3]:
         value=10000
     )
 
-    if st.button(
-        "Add to Portfolio"
-    ):
+    if st.button("Add to Portfolio"):
 
         st.session_state.portfolio.append({
             "stock": stock_choice,
@@ -516,33 +455,19 @@ with tabs[3]:
 
     for item in st.session_state.portfolio:
 
-        if not isinstance(
-            item,
-            dict
-        ):
+        if not isinstance(item, dict):
             continue
 
-        stock = item.get(
-            "stock"
-        )
-
-        amount = item.get(
-            "amount"
-        )
+        stock = item.get("stock")
+        amount = item.get("amount")
 
         if stock not in data.columns:
             continue
 
-        buy_price = data[
-            stock
-        ].iloc[0]
-
-        current_price = data[
-            stock
-        ].iloc[-1]
+        buy_price = data[stock].iloc[0]
+        current_price = data[stock].iloc[-1]
 
         shares = amount / buy_price
-
         current_value = shares * current_price
 
         profit = current_value - amount
@@ -550,13 +475,10 @@ with tabs[3]:
         total_value += current_value
 
         if profit >= 0:
-
             st.success(
                 f"{stock}: ₹{round(current_value,2)} (+₹{round(profit,2)})"
             )
-
         else:
-
             st.error(
                 f"{stock}: ₹{round(current_value,2)} (-₹{abs(round(profit,2))})"
             )
@@ -567,7 +489,7 @@ with tabs[3]:
 
 
 # =====================================================
-# TAB 5 : NEWS
+# TAB 5
 # =====================================================
 with tabs[4]:
 
@@ -586,9 +508,7 @@ with tabs[4]:
 
     try:
 
-        response = requests.get(
-            url
-        )
+        response = requests.get(url)
 
         articles = response.json().get(
             "articles",
@@ -607,25 +527,17 @@ with tabs[4]:
             ).sentiment.polarity
 
             if polarity > 0:
-
                 sentiment = "🟢 Positive"
-
             elif polarity < 0:
-
                 sentiment = "🔴 Negative"
-
             else:
-
                 sentiment = "⚪ Neutral"
 
             st.markdown(
                 f"### {title}"
             )
 
-            st.write(
-                sentiment
-            )
-
+            st.write(sentiment)
             st.write("---")
 
     except:
@@ -636,7 +548,7 @@ with tabs[4]:
 
 
 # =====================================================
-# TAB 6 : ML
+# TAB 6
 # =====================================================
 with tabs[5]:
 
@@ -646,25 +558,14 @@ with tabs[5]:
         key="ml"
     )
 
-    prices = data[
-        ml_stock
-    ].dropna().values
+    prices = data[ml_stock].dropna().values
 
-    if len(prices) < 30:
-
-        st.warning(
-            "Not enough data."
-        )
-
-    else:
+    if len(prices) >= 30:
 
         X = []
         y = []
 
-        for i in range(
-            5,
-            len(prices)
-        ):
+        for i in range(5, len(prices)):
 
             X.append(
                 prices[i-5:i]
@@ -674,17 +575,10 @@ with tabs[5]:
                 prices[i]
             )
 
-        X = np.array(
-            X
-        )
+        X = np.array(X)
+        y = np.array(y)
 
-        y = np.array(
-            y
-        )
-
-        split = int(
-            len(X) * 0.8
-        )
+        split = int(len(X) * 0.8)
 
         model = RandomForestRegressor(
             n_estimators=100,
@@ -700,28 +594,15 @@ with tabs[5]:
             X[split:]
         )
 
-        mae = mean_absolute_error(
-            y[split:],
-            predictions
-        )
-
-        r2 = r2_score(
-            y[split:],
-            predictions
+        st.write(
+            f"MAE: {round(mean_absolute_error(y[split:], predictions),2)}"
         )
 
         st.write(
-            f"MAE: {round(mae,2)}"
+            f"R²: {round(r2_score(y[split:], predictions),2)}"
         )
 
-        st.write(
-            f"R²: {round(r2,2)}"
-        )
-
-        last_window = list(
-            prices[-5:]
-        )
-
+        last_window = list(prices[-5:])
         future_preds = []
 
         for _ in range(30):
@@ -730,21 +611,14 @@ with tabs[5]:
                 [last_window]
             )[0]
 
-            future_preds.append(
-                pred
-            )
+            future_preds.append(pred)
 
             last_window.pop(0)
-
             last_window.append(pred)
 
         forecast_df = pd.DataFrame({
             "Predicted Price": future_preds
         })
-
-        st.subheader(
-            "📈 30 Days Forecast"
-        )
 
         st.line_chart(
             forecast_df
